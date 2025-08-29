@@ -8,6 +8,7 @@ from rdflib import Graph, Namespace, URIRef, Literal, BNode
 from rdflib.namespace import RDF, RDFS, XSD
 from SPARQLWrapper import SPARQLWrapper, POST, JSON
 import os
+from virtuoso import storeDataToGraph
 
 app = Flask(__name__)
 CORS(app)
@@ -18,8 +19,8 @@ SCHEMA = Namespace("http://schema.org/")
 LEXVO = Namespace("http://lexvo.org/id/iso639-3/")
 
 # Virtuoso configuration
-VIRTUOSO_URL = os.getenv('VIRTUOSO_URL', 'http://localhost:8890')  # Keep for Virtuoso endpoint
 LODVIEW_URL = 'http://localhost:8080'  # For resource URIs
+VIRTUOSO_URL = os.getenv('VIRTUOSO_URL', 'http://localhost:8890')  # Keep for Virtuoso endpoint
 SPARQL_ENDPOINT = f"{VIRTUOSO_URL}/sparql"
 SPARQL_UPDATE_ENDPOINT = f"{VIRTUOSO_URL}/sparql-auth"
 
@@ -142,53 +143,20 @@ class NIFProcessor:
 
         return g, graph_uri, graph_id
     
-    def store_in_virtuoso(self, graph, graph_uri, batch_size=1000):
-        """Store the entire RDF graph in Virtuoso with a single SPARQL UPDATE request.
-
-        NOTE: This removes the previous batching behavior and sends one INSERT DATA
-        containing all triples. If the graph is very large this may hit server or
-        client limits.
-        """
-        try:
-            import requests
-            import base64
-
+    def store_in_virtuoso(self, graph, graph_uri, batch_size=1000):        
+        try:            
             triples = list(graph)
             total = len(triples)
-            print(f"Total triples to store: {total}")
-
-            auth_endpoint = SPARQL_UPDATE_ENDPOINT
-            auth_string = base64.b64encode(b"dba:dba").decode('ascii')
-            headers = {
-                'Content-Type': 'application/sparql-update',
-                'Authorization': f'Basic {auth_string}'
-            }
-
-            query = f"""
-            PREFIX nif: <http://persistence.uni-leipzig.de/nlp2rdf/ontologies/nif-core#>
-            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-            PREFIX schema: <http://schema.org/>
-            PREFIX lexvo: <http://lexvo.org/id/iso639-3/>
-            INSERT DATA {{
-                GRAPH {graph_uri.n3()} {{
-            """
-
-            for s, p, o in triples:
-                query += f"        {s.n3()} {p.n3()} {o.n3()} .\n"
-
-            query += """    }
-            }"""
-
-            print("Storing all triples in a single request")
-            response = requests.post(auth_endpoint, data=query.encode('utf-8'), headers=headers, timeout=120)
-            print(f"Store response: {response.status_code}")
-            if response.status_code != 200:
-                print(f"Error storing data: {response.status_code} {response.text}")
+            print(f"Total triples to store: {total}")            
+            graph_str = graph.serialize(format='n3', encoding='utf-8')            
+            graph_name = str(graph_uri)
+            print("Sending serialized graph to virtuoso helper")
+            ok = storeDataToGraph(graph_name, graph_str)
+            if not ok:
+                print("Error: virtuoso helper reported failure")
                 return False
 
-            print("All triples stored successfully!")
+            print("All triples stored successfully via virtuoso helper!")
             return True
         except Exception as e:
             print(f"Exception storing in Virtuoso: {type(e).__name__}: {e}")
