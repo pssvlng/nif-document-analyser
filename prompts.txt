@@ -1,0 +1,75 @@
+Role: You are a Natural Language Processing Expert 
+Objective: You will help with breaking down and analysing text in documents, structure it into a knowledge graph (RDF) format, and write a program to implement functionality surrounding this process
+
+You are going to write a web application using the following technologies:
+Angular for the frontend of the application. Use standard node and npm to install packages and handle dependencies
+A python flask API for the backend. Use the uv package manager and a corresponding toml file to handle the dependencies
+Additionaly there will also be a virtuoso triple store with which the backend will communicate.
+Then there will also be a lodview container that will enable better visual browsability of the triples in the virtuose triple store
+Use docker containers for deployment so that the frontend, backend, virtuoso and lodview can communicate with each other
+
+Application functionality:
+The fontend should be a single page application that allows the use to either upload a pdf document or to paste a (large) body of text into a textbox. If a pdf document is uploaded the text should be extracted and displayed in the text box
+Then the user can click on submit and  the text in the textbox will be sent to the python backend for processing.
+But before sending the text to the backend for processing the user first needs to specify (in a popup) the name of the document and the language. The possible languages are german and english and
+should be displayed in a drop down.
+
+In the python backend the text will now be processed in a REST api.
+To process the text you are going to use the NIF vocabulary (https://persistence.uni-leipzig.org/nlp2rdf/specification/core.html, https://persistence.uni-leipzig.org/nlp2rdf/)
+@prefix nif: <http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <http://schema.org/> .
+@prefix lexvo: <http://lexvo.org/id/iso639-3/> .
+
+# 1. Define the URI for the named graph.
+<http://localhost/graph/d188686e-b6a3-48b4-81d3-6e7e59b20755> {
+
+    # 2. The top-level document (the primary nif:Context)
+    <http://localhost/resource/d188686e-b6a3-48b4-81d3-6e7e59b20755> a nif:Context , nif:String ;
+        nif:isString "This is the first sentence. This is the second sentence." ;
+        nif:beginIndex "0"^^xsd:int ;
+        nif:endIndex "60"^^xsd:int ;
+        rdfs:isDefinedBy <http://localhost/graph/d188686e-b6a3-48b4-81d3-6e7e59b20755> ;
+        schema:name "My Sample Document" ;
+        nif:predLang lexvo:eng .
+
+    # 3. The paragraph
+    <http://localhost/resource/14f6b283-92f7-418f-a9b0-1845f9e7c10b> a nif:Paragraph , nif:Context , nif:String ;
+        nif:referenceContext <http://localhost/resource/d188686e-b6a3-48b4-81d3-6e7e59b20755> ;
+        nif:isString "This is the first sentence. This is the second sentence." ;
+        nif:beginIndex "0"^^xsd:int ;
+        nif:endIndex "60"^^xsd:int ;
+        rdfs:isDefinedBy <http://localhost/graph/d188686e-b6a3-48b4-81d3-6e7e59b20755> .
+
+    # 4. The first sentence
+    <http://localhost/resource/419c8f07-8e7c-40d6-993d-3b8c5e6488d5> a nif:Sentence , nif:String ;
+        nif:referenceContext <http://localhost/resource/14f6b283-92f7-418f-a9b0-1845f9e7c10b> ;
+        nif:isString "This is the first sentence." ;
+        nif:beginIndex "0"^^xsd:int ;
+        nif:endIndex "27"^^xsd:int ;
+        rdfs:isDefinedBy <http://localhost/graph/d188686e-b6a3-48b4-81d3-6e7e59b20755> .
+
+    # 5. The second sentence
+    <http://localhost/resource/33b0e14a-8745-42f5-b6d3-2f080a905a5a> a nif:Sentence , nif:String ;
+        nif:referenceContext <http://localhost/resource/14f6b283-92f7-418f-a9b0-1845f9e7c10b> ;
+        nif:isString "This is the second sentence." ;
+        nif:beginIndex "28"^^xsd:int ;
+        nif:endIndex "60"^^xsd:int ;
+        rdfs:isDefinedBy <http://localhost/graph/d188686e-b6a3-48b4-81d3-6e7e59b20755> .
+}
+
+So as you can see each resource has a guid that is generated so that each resource is unique. All the elements of the document are saved into a named graph
+This named graph will also have its own unique guid and each resource will reference it with the rdfs isDefinedBy predicate. The named graph together with the 
+relevant triples in the named graph should be saved to the virtuose triple store. The virtuoso container should also have the sparql endpoint set up in such a way
+that it can be queried. When clicking on one of the uris of the query results, it should go to the lodview so that the user can further browse the triples
+If the lodview runs on a different port then the uris can be adjusted so that it has the format http://localhost:portnr/.... in the virtuoso container so that the browsability of
+the triples in the virtuoso triple store is ensured. 
+
+Also take care that the language the user specified and the name of the document is saved correctly against the document context. So language can either be
+lexvo:eng or lexvo:deu
+
+
+
+
